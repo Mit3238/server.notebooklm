@@ -15,6 +15,8 @@ import datetime
 import hashlib
 import hmac
 from urllib.parse import urlparse, quote
+import sys
+import traceback
 
 # Load environment variables
 load_dotenv()
@@ -24,13 +26,28 @@ CORS(app) # Enable CORS for all routes and origins
 key = os.getenv('AWS_ACCESS_KEY_ID')
 secret = os.getenv('AWS_SECRET_ACCESS_KEY')
 
-# Get MongoDB connection string from environment variable
-mongo_uri = os.getenv('MONGODB_URI')
-client = MongoClient(mongo_uri)
+# Make sure directories exist
+try:
+    os.makedirs('audio', exist_ok=True)
+except Exception as e:
+    print(f"Error creating audio directory: {e}")
 
-# Select the database and collection
-db = client.get_default_database()
-podcast_collection = db.podcast
+# Add error handling around MongoDB connection
+try:
+    # Get MongoDB connection string from environment variable
+    mongo_uri = os.getenv('MONGODB_URI')
+    if not mongo_uri:
+        print("Warning: MONGODB_URI environment variable not set")
+        mongo_uri = "mongodb://localhost:27017/podcast"
+    
+    client = MongoClient(mongo_uri)
+    # Select the database and collection
+    db = client.get_default_database()
+    podcast_collection = db.podcast
+except Exception as e:
+    print(f"Error connecting to MongoDB: {e}")
+    traceback.print_exc()
+
 audio_list = []
 
 client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))

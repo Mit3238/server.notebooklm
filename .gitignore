@@ -3,3 +3,5 @@ audio2/
 *.mp3
 *.ipynb
 .env
+*.pyc
+*.log
