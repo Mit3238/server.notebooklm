@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Chat</title>
+    <!-- Add Font Awesome CDN link -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <style>
+      /* CSS remains largely the same, BUT update the audio indicator style */
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f0f2f5;
+        color: #333;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 280px;
+        background-color: #fff;
+        padding: 20px;
+        border-right: 1px solid #e0e0e0;
+        height: 100%;
+        overflow-y: auto;
+        box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.05);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-title {
+        font-size: 1.3em;
+        margin-bottom: 20px;
+        color: #3f51b5;
+        border-bottom: 2px solid #e0e0e0;
+        padding-bottom: 10px;
+        flex-shrink: 0;
+      }
+
+      .chat-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        overflow-y: auto;
+        flex-grow: 1;
+      }
+
+      .chat-item {
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        border: 1px solid #e0e0e0;
+        position: relative; /* For audio indicator positioning */
+      }
+
+      .chat-item:hover {
+        background-color: #e8e8e8;
+      }
+
+      .chat-item.active {
+        background-color: #d5d8f0;
+        border-color: #3f51b5;
+        font-weight: bold;
+      }
+
+      /* --- UPDATED: Style for Font Awesome Speaker Icon --- */
+      .audio-indicator-icon {
+        color: #4caf50; /* Green color for the icon */
+        margin-left: 2px; /* Reset margin to original value */
+        margin-right: 8px; /* Reset margin to original value */
+        vertical-align: middle;
+        font-size: 0.9em; /* Adjust size as needed */
+      }
+      /* Remove old dot style */
+      /* .audio-indicator { ... } */
+
+      .chat-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background-color: #f0f2f5;
+      }
+
+      .chat-header {
+        padding: 20px;
+        border-bottom: 1px solid #e0e0e0;
+        text-align: center;
+        background-color: #fff;
+        box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.05);
+        flex-shrink: 0;
+      }
+
+      .chat-header h2 {
+        color: #3f51b5;
+        margin: 0;
+        font-size: 1.5em;
+      }
+
+      .chat-display {
+        flex: 1;
+        padding: 25px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        background-color: #f0f2f5;
+      }
+
+      .message {
+        padding: 12px 20px;
+        border-radius: 25px;
+        margin-bottom: 12px;
+        max-width: 80%;
+        word-wrap: break-word;
+        box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.05);
+      }
+
+      /* NEW: Add class specifically for the current user prompt message */
+      .current-user-prompt .message.user-message {
+        /* No specific style needed now, just using the class as a selector */
+      }
+
+      .user-message {
+        /* General style for user messages */
+        background-color: #e3f2fd;
+        align-self: flex-start;
+        color: #1a237e;
+      }
+
+      .llm-message {
+        /* General LLM text or errors */
+        background-color: #fff;
+        align-self: flex-start;
+        color: #222;
+        margin-top: 5px;
+        border: 1px solid #eee;
+      }
+
+      /* --- Audio Controls Area --- */
+      .audio-controls-area {
+        align-self: flex-start;
+        width: 95%;
+        max-width: 900px;
+        margin-top: 15px;
+        margin-bottom: 10px;
+        padding: 15px;
+        background-color: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      .audio-controls-area p {
+        margin: 0 0 10px 0;
+        font-size: 0.9em;
+        color: #555;
+      }
+
+      #generateAudioBtn {
+        padding: 8px 15px;
+        border: none;
+        border-radius: 5px;
+        background-color: #ff9800;
+        color: white;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: background-color 0.3s ease, opacity 0.3s ease;
+      }
+      #generateAudioBtn:hover {
+        background-color: #f57c00;
+      }
+      #generateAudioBtn:disabled {
+        background-color: #bdbdbd;
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+
+      #audioPlayerContainer {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+      }
+
+      #podcastAudioPlayer {
+        flex-grow: 1;
+        min-width: 250px;
+        height: 40px;
+      }
+
+      #downloadAudioLink {
+        padding: 8px 15px;
+        border-radius: 5px;
+        background-color: #4caf50;
+        color: white;
+        text-decoration: none;
+        font-size: 0.9em;
+        transition: background-color 0.3s ease;
+        white-space: nowrap;
+      }
+      #downloadAudioLink:hover {
+        background-color: #388e3c;
+      }
+      /* --- End Audio Controls Area --- */
+
+      /* --- Styles for Structured Podcast Content --- */
+      .podcast-content-wrapper {
+        /* Wrapper for the text content */
+        align-self: flex-start;
+        width: 95%;
+        max-width: 900px;
+        margin-top: 5px;
+      }
+      .podcast-content {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e0e0e0;
+        /* Removed margin-top, width, max-width, align-self - handled by wrapper */
+      }
+
+      .podcast-section-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #3f51b5;
+        margin-top: 15px;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+      }
+      .podcast-section-title:first-of-type {
+        margin-top: 0;
+      }
+
+      .podcast-dialogues {
+        margin-left: 10px;
+      }
+
+      .podcast-dialogue-line {
+        margin-bottom: 8px;
+        line-height: 1.5;
+      }
+
+      .podcast-speaker {
+        font-weight: bold;
+        color: #555;
+        margin-right: 5px;
+        text-transform: uppercase;
+      }
+
+      .podcast-missing-data {
+        font-style: italic;
+        color: #999;
+      }
+      /* --- End Podcast Styles --- */
+
+      .chat-input-area {
+        padding: 20px;
+        border-top: 1px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        background-color: #fff;
+        box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.05);
+        flex-shrink: 0;
+      }
+
+      .chat-input {
+        flex: 1;
+        padding: 12px;
+        border-radius: 25px;
+        border: 1px solid #ccc;
+        margin-right: 10px;
+        font-size: 1em;
+      }
+
+      .send-button {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 25px;
+        background-color: #3f51b5;
+        color: white;
+        cursor: pointer;
+        font-size: 1em;
+        transition: background-color 0.3s ease;
+      }
+
+      .send-button:hover {
+        background-color: #303f9f;
+      }
+
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+
+      .loading-spinner {
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3f51b5;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1.5s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      #initialMessage {
+        text-align: center;
+        color: #777;
+        font-style: italic;
+        padding: 20px;
+        margin: auto;
+      }
+
+      /* Utility class to hide elements */
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sidebar">
+      <h2 class="sidebar-title">Past Chats</h2>
+      <ul class="chat-list" id="chatList">
+        <li class="chat-item loading-item">Loading chats...</li>
+      </ul>
+    </div>
+
+    <div class="chat-container">
+      <div class="chat-header">
+        <h2>LLM Chat Window</h2>
+      </div>
+      <div class="chat-display" id="chatDisplay">
+        <!-- Elements will be added dynamically here -->
+        <div id="initialMessage">
+          Click on a chat from the left to view conversation or send a new
+          message below.
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <input
+          type="text"
+          id="promptInput"
+          class="chat-input"
+          placeholder="Type your prompt here..."
+          value="Tell me about "
+        />
+        <button class="send-button" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <script>
+      const chatListElement = document.getElementById("chatList");
+      const chatDisplayElement = document.getElementById("chatDisplay");
+      const promptInputElement = document.getElementById("promptInput");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+      const initialMessageElement = document.getElementById("initialMessage");
+
+      // Keep references to dynamically created elements, but don't assume they exist initially
+      let audioControlsPlaceholder = null;
+      let podcastContentPlaceholder = null;
+      let generateAudioBtn = null;
+      let audioPlayerContainer = null;
+      let podcastAudioPlayer = null;
+      let downloadAudioLink = null;
+      let audioStatusMessage = null;
+
+      let currentChatId = null;
+
+      function showLoading() {
+        loadingOverlay.style.display = "flex";
+      }
+
+      function hideLoading() {
+        loadingOverlay.style.display = "none";
+      }
+
+      function setActiveChatItem(id) {
+        const chatItems = chatListElement.querySelectorAll(".chat-item");
+        chatItems.forEach((item) => {
+          item.classList.remove("active");
+          if (item.dataset.chatId === id) {
+            item.classList.add("active");
+          }
+        });
+      }
+
+      async function fetchPastChats() {
+        showLoading();
+        chatListElement.innerHTML =
+          '<li class="chat-item loading-item">Loading chats...</li>';
+        try {
+          const response = await fetch("/api/podcasts");
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const chats = await response.json();
+          chatListElement.innerHTML = ""; // Clear loading message
+          if (!Array.isArray(chats)) {
+            throw new Error(
+              "Invalid response format: Expected an array of chats."
+            );
+          }
+          if (chats.length === 0) {
+            chatListElement.innerHTML =
+              '<li class="chat-item">No past chats. Start a new one!</li>';
+          } else {
+            chats.forEach((chat) => {
+              if (chat && typeof chat === "object" && chat._id && chat.prompt) {
+                const listItem = document.createElement("li");
+                listItem.className = "chat-item";
+                listItem.dataset.chatId = chat._id;
+
+                // --- UPDATED: Use Font Awesome Icon ---
+                if (chat.audio) {
+                  const icon = document.createElement("i");
+                  // Use Font Awesome classes + your custom class
+                  icon.className = "fas fa-volume-up audio-indicator-icon";
+                  icon.title = "Audio available";
+                  listItem.appendChild(icon);
+                }
+                // --- End Icon Update ---
+
+                const promptTextNode = document.createTextNode(
+                  chat.prompt || "[No Prompt]"
+                );
+                listItem.appendChild(promptTextNode);
+
+                listItem.addEventListener("click", () => {
+                  loadChatDetails(chat._id);
+                  // setActiveChatItem(chat._id); // This is now called inside loadChatDetails
+                });
+                chatListElement.appendChild(listItem);
+              } else {
+                console.warn("Skipping invalid chat item received:", chat);
+              }
+            });
+          }
+          if (currentChatId) {
+            setActiveChatItem(currentChatId);
+          }
+        } catch (error) {
+          console.error("Error fetching past chats:", error);
+          chatListElement.innerHTML =
+            '<li class="chat-item error-item">Error loading chats.</li>';
+        } finally {
+          hideLoading();
+        }
+      }
+
+      function safeJsonParse(jsonString) {
+        // No changes needed here
+        if (typeof jsonString !== "string") {
+          console.warn(
+            "safeJsonParse: Input is not a string, returning null.",
+            jsonString
+          );
+          return null;
+        }
+        try {
+          return JSON.parse(jsonString);
+        } catch (e) {
+          console.error("safeJsonParse: Error parsing JSON string:", e);
+          console.error("Original string:", jsonString);
+          return null;
+        }
+      }
+
+      // --- Function to create the display structure (placeholders) ---
+      function createDisplayStructure() {
+        chatDisplayElement.innerHTML = ""; // Clear everything first
+
+        // Create User Prompt container
+        const userPromptContainer = document.createElement("div");
+        userPromptContainer.className = "current-user-prompt"; // Add class for easy removal
+        chatDisplayElement.appendChild(userPromptContainer);
+
+        // Create Audio Controls Placeholder
+        audioControlsPlaceholder = document.createElement("div");
+        audioControlsPlaceholder.id = "audioControlsPlaceholder";
+        audioControlsPlaceholder.className = "hidden"; // Start hidden
+        audioControlsPlaceholder.innerHTML = `
+                 <div class="audio-controls-area">
+                    <p id="audioStatusMessage"></p>
+                    <button id="generateAudioBtn" class="hidden" onclick="startAudioGeneration()">Generate Audio</button>
+                    <div id="audioPlayerContainer" class="hidden">
+                        <audio id="podcastAudioPlayer" controls preload="metadata"></audio>
+                        <a id="downloadAudioLink" href="#" download class="hidden">Download MP3</a>
+                    </div>
+                 </div>`;
+        chatDisplayElement.appendChild(audioControlsPlaceholder);
+
+        // Create Podcast Content Placeholder
+        podcastContentPlaceholder = document.createElement("div");
+        podcastContentPlaceholder.id = "podcastContentPlaceholder";
+        podcastContentPlaceholder.className = "podcast-content-wrapper"; // Use the wrapper class
+        chatDisplayElement.appendChild(podcastContentPlaceholder);
+
+        // Re-assign references to the newly created elements
+        generateAudioBtn = document.getElementById("generateAudioBtn");
+        audioPlayerContainer = document.getElementById("audioPlayerContainer");
+        podcastAudioPlayer = document.getElementById("podcastAudioPlayer");
+        downloadAudioLink = document.getElementById("downloadAudioLink");
+        audioStatusMessage = document.getElementById("audioStatusMessage");
+      }
+
+      async function loadChatDetails(id) {
+        showLoading();
+        currentChatId = id; // Store the ID of the chat being loaded
+        setActiveChatItem(id); // Highlight the item in the sidebar
+
+        // --- FIXED: Create fresh display structure ---
+        createDisplayStructure(); // This clears old content and sets up placeholders
+
+        // Find the (now empty) user prompt container created by createDisplayStructure
+        const userPromptContainer = chatDisplayElement.querySelector(
+          ".current-user-prompt"
+        );
+        if (!userPromptContainer) {
+          console.error("Could not find user prompt container after creation!");
+          hideLoading();
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/podcasts/${id}`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const chatDetails = await response.json();
+
+          // --- Display User Prompt in its dedicated container ---
+          if (chatDetails && typeof chatDetails.prompt === "string") {
+            displayMessage("user", chatDetails.prompt, userPromptContainer); // Target the container
+          } else {
+            displayMessage(
+              "user",
+              "[Prompt missing or invalid]",
+              userPromptContainer
+            );
+            console.warn(
+              "Received chat details missing or invalid prompt:",
+              chatDetails
+            );
+          }
+
+          // --- Handle Audio ---
+          audioControlsPlaceholder.classList.remove("hidden"); // Show the audio control area
+          const audioPath = chatDetails?.audio;
+          // const audioApiEndpoint = `/api/generate_audio/${id}`;
+          const audioApiEndpoint = `https://s3.tebi.io/podcast/${id}.mp3`; // Updated to include the chat ID
+
+          if (audioPath && typeof audioPath === "string") {
+            // Audio exists
+            console.log(`Audio found for ${id}: ${audioPath}`);
+            audioStatusMessage.textContent = "Audio is available.";
+            podcastAudioPlayer.src = audioApiEndpoint;
+            downloadAudioLink.href = audioApiEndpoint;
+            downloadAudioLink.download = `${id}.mp3`;
+
+            audioPlayerContainer.classList.remove("hidden");
+            downloadAudioLink.classList.remove("hidden");
+            generateAudioBtn.classList.add("hidden");
+          } else {
+            // Audio does not exist
+            console.log(`Audio not found for ${id}. Showing generate button.`);
+            audioStatusMessage.textContent =
+              "Generate an audio version of this podcast.";
+            generateAudioBtn.classList.remove("hidden");
+            generateAudioBtn.disabled = false;
+            generateAudioBtn.textContent = "Generate Audio";
+            audioPlayerContainer.classList.add("hidden");
+            downloadAudioLink.classList.add("hidden");
+          }
+
+          // --- Process and display the text answer ---
+          let podcastData = null;
+          let rawAnswer = chatDetails?.answer;
+
+          if (typeof rawAnswer === "string") {
+            podcastData = safeJsonParse(rawAnswer);
+          } else if (typeof rawAnswer === "object" && rawAnswer !== null) {
+            podcastData = rawAnswer;
+          } else {
+            console.warn(
+              "Answer is neither a string nor a valid object:",
+              rawAnswer
+            );
+          }
+
+          // Display podcast text content or fallback message into its placeholder
+          podcastContentPlaceholder.innerHTML = ""; // Clear placeholder before adding content
+          if (podcastData && typeof podcastData === "object") {
+            displayPodcastContent(podcastData); // Renders into placeholder
+          } else {
+            displayMessage(
+              "llm",
+              typeof rawAnswer !== "undefined"
+                ? String(rawAnswer)
+                : "[No answer content]",
+              podcastContentPlaceholder
+            );
+            if (
+              typeof rawAnswer === "string" &&
+              rawAnswer.trim().startsWith("{")
+            ) {
+              console.error(
+                "Failed to parse potential JSON answer. Raw answer displayed instead."
+              );
+            }
+          }
+          // --- End processing answer ---
+        } catch (error) {
+          console.error("Error fetching or processing chat details:", error);
+          podcastContentPlaceholder.innerHTML = ""; // Clear potentially partial content
+          audioControlsPlaceholder.classList.add("hidden"); // Hide audio controls on error
+          // Display error message within the podcast content placeholder
+          displayMessage(
+            "llm",
+            `Error loading chat details: ${error.message}`,
+            podcastContentPlaceholder
+          );
+        } finally {
+          hideLoading();
+          chatDisplayElement.scrollTop = 0; // Scroll to top after loading
+        }
+      }
+
+      // --- Function to Start Audio Generation ---
+      async function startAudioGeneration() {
+        if (!currentChatId) {
+          alert("Cannot generate audio. Chat ID is missing.");
+          return;
+        }
+        // Check if elements exist (they should if button is clickable)
+        if (!generateAudioBtn || !audioStatusMessage) {
+          console.error("Audio control elements not found!");
+          return;
+        }
+
+        generateAudioBtn.disabled = true;
+        generateAudioBtn.textContent = "Generating...";
+        audioStatusMessage.textContent = "Requesting audio generation...";
+        showLoading();
+
+        try {
+          const response = await fetch(`/api/generate_audio/${currentChatId}`, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.status === 202) {
+            audioStatusMessage.textContent =
+              data.message ||
+              "Audio generation started. Click this chat again later to check.";
+            generateAudioBtn.textContent = "In Progress"; // Keep disabled
+          } else if (response.status === 200) {
+            audioStatusMessage.textContent =
+              data.message || "Audio generation is already in progress.";
+            generateAudioBtn.textContent = "In Progress"; // Keep disabled
+          } else {
+            throw new Error(
+              data.message ||
+                `Failed to start generation. Status: ${response.status}`
+            );
+          }
+        } catch (error) {
+          console.error("Error starting audio generation:", error);
+          audioStatusMessage.textContent = `Error: ${error.message}`;
+          generateAudioBtn.disabled = false; // Re-enable on error
+          generateAudioBtn.textContent = "Generate Audio";
+        } finally {
+          hideLoading();
+        }
+      }
+
+      async function sendMessage() {
+        const promptText = promptInputElement.value.trim();
+        if (!promptText) {
+          alert("Please enter a prompt.");
+          return;
+        }
+
+        // --- Create fresh display structure for the new message ---
+        createDisplayStructure();
+
+        // Find the user prompt container
+        const userPromptContainer = chatDisplayElement.querySelector(
+          ".current-user-prompt"
+        );
+        if (!userPromptContainer) {
+          console.error(
+            "Could not find user prompt container for new message!"
+          );
+          return; // Should not happen, but good to check
+        }
+
+        // Display user prompt in its dedicated container
+        displayMessage("user", promptText, userPromptContainer);
+
+        promptInputElement.value = "";
+        showLoading();
+        currentChatId = null; // This is a *new* chat turn, ID determined by response
+        setActiveChatItem(null); // Deselect in sidebar
+
+        try {
+          const response = await fetch("/api/podcasts", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ prompt: promptText }),
+          });
+
+          const responseBody = await response.text();
+
+          if (!response.ok) {
+            let errorMsg = `HTTP error ${response.status}: ${response.statusText}`;
+            try {
+              const errorData = JSON.parse(responseBody);
+              errorMsg = errorData.message || errorMsg;
+            } catch (e) {
+              /* Ignore */
+            }
+            throw new Error(errorMsg);
+          }
+
+          const data = safeJsonParse(responseBody);
+          if (!data) {
+            throw new Error("Received invalid JSON response from server.");
+          }
+
+          // Process and display the result (podcast text)
+          let podcastData = null;
+          let rawResult = data?.result;
+
+          if (typeof rawResult === "string")
+            podcastData = safeJsonParse(rawResult);
+          else if (typeof rawResult === "object" && rawResult !== null)
+            podcastData = rawResult;
+          else
+            console.warn(
+              "Result is neither a string nor a valid object:",
+              rawResult
+            );
+
+          // Clear placeholder before adding content
+          podcastContentPlaceholder.innerHTML = "";
+          if (podcastData && typeof podcastData === "object") {
+            displayPodcastContent(podcastData);
+          } else {
+            displayMessage(
+              "llm",
+              typeof rawResult !== "undefined"
+                ? String(rawResult)
+                : "[No result content]",
+              podcastContentPlaceholder
+            );
+            if (
+              typeof rawResult === "string" &&
+              rawResult.trim().startsWith("{")
+            ) {
+              console.error(
+                "Failed to parse potential JSON result. Raw result displayed instead."
+              );
+            }
+          }
+          // End processing result
+
+          // --- Handle Audio for NEW message ---
+          let newId = null;
+          if (data.newPodcastId) newId = data.newPodcastId;
+          else if (data.podcast && typeof data.podcast === "string") {
+            const match = data.podcast.match(/ObjectId\('([^']+)'\)/);
+            if (match && match[1]) newId = match[1];
+          }
+
+          if (newId) {
+            currentChatId = newId; // Set current ID *after* successful creation
+            audioControlsPlaceholder.classList.remove("hidden");
+            audioStatusMessage.textContent =
+              "Generate an audio version of this podcast.";
+            generateAudioBtn.classList.remove("hidden");
+            generateAudioBtn.disabled = false;
+            generateAudioBtn.textContent = "Generate Audio";
+            audioPlayerContainer.classList.add("hidden");
+            downloadAudioLink.classList.add("hidden");
+          } else {
+            console.warn(
+              "Could not determine ID for the new chat, audio controls hidden."
+            );
+            audioControlsPlaceholder.classList.add("hidden");
+          }
+          // --- End Audio Handling for NEW message ---
+
+          // Refresh list and attempt highlight
+          fetchPastChats()
+            .then(() => {
+              if (currentChatId) {
+                // If we got an ID for the new chat
+                setActiveChatItem(currentChatId);
+                console.log("Highlighting new chat:", currentChatId);
+              }
+            })
+            .catch((err) =>
+              console.error("Error refreshing chat list after send:", err)
+            );
+        } catch (error) {
+          console.error("Error sending message or processing response:", error);
+          // Display error within the podcast content placeholder area
+          podcastContentPlaceholder.innerHTML = ""; // Clear placeholder on error too
+          displayMessage(
+            "llm",
+            `Error: ${error.message}`,
+            podcastContentPlaceholder
+          );
+        } finally {
+          hideLoading();
+          chatDisplayElement.scrollTop = 0; // Scroll to top after new message/response
+        }
+      }
+
+      // Display message in a target container
+      function displayMessage(sender, messageText, targetElement) {
+        // Ensure targetElement is valid before proceeding
+        if (!targetElement || !(targetElement instanceof Element)) {
+          console.error(
+            "Invalid targetElement provided to displayMessage:",
+            targetElement
+          );
+          // Fallback: Append to main display if target is invalid? Or just log?
+          // chatDisplayElement.appendChild(messageDiv); // Decide on fallback behavior
+          return;
+        }
+        const messageDiv = document.createElement("div");
+        messageDiv.classList.add("message");
+        if (sender === "user") {
+          messageDiv.classList.add("user-message");
+        } else {
+          messageDiv.classList.add("llm-message");
+        }
+        messageDiv.textContent = messageText;
+        targetElement.appendChild(messageDiv); // Append to the specified target
+      }
+
+      // Display structured podcast content (renders into podcastContentPlaceholder)
+      function displayPodcastContent(podcastData) {
+        // Ensure placeholder exists before clearing/appending
+        if (!podcastContentPlaceholder) {
+          console.error(
+            "displayPodcastContent called but podcastContentPlaceholder is null!"
+          );
+          return;
+        }
+        podcastContentPlaceholder.innerHTML = ""; // Clear placeholder first
+
+        if (
+          !podcastData ||
+          typeof podcastData !== "object" ||
+          Array.isArray(podcastData)
+        ) {
+          console.error(
+            "Invalid podcastData provided to displayPodcastContent:",
+            podcastData
+          );
+          displayMessage(
+            "llm",
+            "[Error: Could not display podcast content due to invalid data format]",
+            podcastContentPlaceholder
+          );
+          return;
+        }
+
+        const podcastContainer = document.createElement("div");
+        podcastContainer.classList.add("podcast-content"); // Add the styling class for the content box
+
+        const sections = Object.keys(podcastData);
+        if (sections.length === 0) {
+          podcastContainer.textContent =
+            "[Podcast content appears to be empty]";
+        }
+        sections.forEach((sectionKey) => {
+          // (Logic inside remains the same as previous correct version)
+          const section = podcastData[sectionKey];
+          if (!section || typeof section !== "object") {
+            console.warn(
+              `Skipping invalid section data for key "${sectionKey}":`,
+              section
+            );
+            return;
+          }
+          const titleElement = document.createElement("h3");
+          titleElement.classList.add("podcast-section-title");
+          titleElement.textContent =
+            typeof section.title === "string" && section.title.trim()
+              ? section.title
+              : "[Untitled Section]";
+          podcastContainer.appendChild(titleElement);
+          const dialoguesContainer = document.createElement("div");
+          dialoguesContainer.classList.add("podcast-dialogues");
+          if (
+            Array.isArray(section.dialogues) &&
+            section.dialogues.length > 0
+          ) {
+            section.dialogues.forEach((dialogue, index) => {
+              if (!dialogue || typeof dialogue !== "object") {
+                console.warn(
+                  `Skipping invalid dialogue data in section "${sectionKey}" at index ${index}:`,
+                  dialogue
+                );
+                const errorLine = document.createElement("p");
+                errorLine.classList.add(
+                  "podcast-dialogue-line",
+                  "podcast-missing-data"
+                );
+                errorLine.textContent = "[Invalid dialogue data]";
+                dialoguesContainer.appendChild(errorLine);
+                return;
+              }
+              const lineElement = document.createElement("p");
+              lineElement.classList.add("podcast-dialogue-line");
+              const speakerElement = document.createElement("span");
+              speakerElement.classList.add("podcast-speaker");
+              const speakerName =
+                typeof dialogue.speaker === "string" && dialogue.speaker.trim()
+                  ? dialogue.speaker.toUpperCase()
+                  : "SPEAKER?";
+              speakerElement.textContent = speakerName + ":";
+              lineElement.appendChild(speakerElement);
+              const textElement = document.createElement("span");
+              const dialogueText =
+                typeof dialogue.text === "string"
+                  ? dialogue.text.replace(/\*/g, " ")
+                  : "[Missing text]";
+              textElement.textContent = dialogueText;
+              lineElement.appendChild(textElement);
+              dialoguesContainer.appendChild(lineElement);
+            });
+          } else {
+            const noDialoguesElement = document.createElement("p");
+            noDialoguesElement.classList.add("podcast-missing-data");
+            noDialoguesElement.textContent = "[No dialogues in this section]";
+            dialoguesContainer.appendChild(noDialoguesElement);
+          }
+          podcastContainer.appendChild(dialoguesContainer);
+        });
+        // Append the finished podcast container to the placeholder WRAPPER
+        podcastContentPlaceholder.appendChild(podcastContainer);
+      }
+
+      // --- Event Listeners ---
+      promptInputElement.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") {
+          sendMessage();
+        }
+      });
+
+      // --- Initial Load ---
+      // Show initial message until a chat is loaded
+      // Initial fetch of past chats when the page loads
+      fetchPastChats();
+    </script>
+  </body>
+</html>

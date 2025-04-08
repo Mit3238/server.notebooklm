@@ -1,0 +1,10 @@
+Flask==3.1.0
+Flask_Cors==5.0.0
+flask_cors==5.0.1
+protobuf==3.20.3
+pydub==0.25.1
+pymongo==4.3.3
+python-dotenv==1.1.0
+Requests==2.32.3
+google-genai==1.9.0
+json_repair==0.30.0
